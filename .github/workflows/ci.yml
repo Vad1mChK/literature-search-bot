@@ -18,6 +18,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
