@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.3.0"
+    application
     id("org.jlleitschuh.gradle.ktlint") version "12.0.3"
 }
 
@@ -17,6 +18,10 @@ dependencies {
 
 kotlin {
     jvmToolchain(17)
+}
+
+application {
+    mainClass.set("com.vad1mchk.litsearchbot.MainKt")
 }
 
 ktlint {
