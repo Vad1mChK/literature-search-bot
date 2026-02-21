@@ -1,7 +1,6 @@
 package com.vad1mchk.litsearchbot
 
 import org.junit.jupiter.api.Assertions.assertNotEquals
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 
 class ExampleTest {
