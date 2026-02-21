@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.3.0"
+    id("org.jlleitschuh.gradle.ktlint") version "12.0.3"
 }
 
 group = "com.vad1mchk.litsearchbot"
@@ -16,6 +17,11 @@ dependencies {
 
 kotlin {
     jvmToolchain(17)
+}
+
+ktlint {
+    ignoreFailures = false
+    // disabledRules.set(setOf("no-wildcard-imports"))
 }
 
 tasks.test {
