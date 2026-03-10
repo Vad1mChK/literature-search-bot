@@ -45,3 +45,6 @@ bin/
 
 ### Env ###
 .env
+
+### Data for development ###
+data/
