@@ -1,0 +1,6 @@
+# noinspection EditorConfigKeyCorrectness
+[*.{kt,kts}]
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_function-signature = disabled
+ktlint_standard_string-template-indent = disabled
+ktlint_standard_no-wildcard-imports = disabled
