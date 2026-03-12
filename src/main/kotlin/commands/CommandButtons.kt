@@ -8,9 +8,13 @@ import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.vad1mchk.litsearchbot.auth.RegisterStatus
+import com.vad1mchk.litsearchbot.database.IndexedDocumentsDao
 import com.vad1mchk.litsearchbot.database.RegisterRequestDao
+import com.vad1mchk.litsearchbot.database.SearchQueryLookupDao
 import com.vad1mchk.litsearchbot.database.UserDao
 import com.vad1mchk.litsearchbot.util.escapeMarkdownV2
+import com.vad1mchk.litsearchbot.util.formatSnippetForMarkdownV2
+import com.vad1mchk.litsearchbot.util.md5
 import com.vad1mchk.litsearchbot.util.toChatId
 import java.time.Instant
 import java.time.ZoneOffset
@@ -20,6 +24,7 @@ import kotlin.math.min
 
 private const val USERS_PAGE_SIZE = 10
 private const val REQS_PAGE_SIZE = 10
+private const val SEARCH_PAGE_SIZE = 5
 private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
 fun CommandHandlerEnvironment.showUsersPage(offset: Int) {
@@ -72,7 +77,7 @@ private fun showUsersPageCommon(
         "• `${u.userId}`, @$handle, $role"
     }
 
-    val buttons = buildPaginationButtons(offset, total, key = "listUsers")
+    val buttons = buildPaginationButtonsFull(offset, total, key = "listUsers")
     val finalText = header + body
 
     if (messageId != null) {
@@ -150,7 +155,7 @@ private fun showRegisterRequestsPageCommon(
         "*или* " +
         "`/a\\_reject\\_req \\<request\\_id\\>`\\."
 
-    val buttons = buildPaginationButtons(offset, total, key = "listRegisterRequests")
+    val buttons = buildPaginationButtonsFull(offset, total, key = "listRegisterRequests")
     val finalText = header + body + footer
 
     if (messageId != null) {
@@ -172,24 +177,183 @@ private fun showRegisterRequestsPageCommon(
     }
 }
 
-fun buildPaginationButtons(offset: Int, total: Int, key: String): InlineKeyboardMarkup {
-    val prevOffset = maxOf(offset - USERS_PAGE_SIZE, 0)
-    val nextOffset = offset + USERS_PAGE_SIZE
+// In CommandHandler
+fun CommandHandlerEnvironment.showSearchPage(query: String) {
+    val hash = md5(query) // Your helper to get MD5 string
 
+    // Save to LRU cache so callback can find it later
+    SearchQueryLookupDao.upsertQuery(hash, query)
+
+    showSearchPageCommon(
+        bot = bot,
+        chatId = message.chat.id.toChatId(),
+        queryText = query,
+        queryHash = hash,
+        offset = 0,
+        limit = SEARCH_PAGE_SIZE,
+        replyToMessageId = message.messageId
+    )
+}
+
+// In CallbackQueryHandler
+// Data format: "searchDocs:<queryHash>:<offset>"
+fun CallbackQueryHandlerEnvironment.showSearchPageFromCallback() {
+    val args = callbackQuery.data.split(":")
+    if (args.size < 3) return
+
+    val queryHash = args[1]
+    val offset = args[2].toIntOrNull() ?: 0
+    val limit = args[3].toIntOrNull() ?: 10
+
+    // Retrieve the original query text from the database
+    val queryText = SearchQueryLookupDao.findByHash(queryHash)
+
+    if (queryText == null) {
+        bot.answerCallbackQuery(callbackQuery.id, text = "Сессия поиска истекла. Повторите запрос.", showAlert = true)
+        return
+    }
+
+    val chatId = callbackQuery.message?.chat?.id ?: return
+
+    showSearchPageCommon(
+        bot = bot,
+        chatId = chatId.toChatId(),
+        queryText = queryText,
+        queryHash = queryHash,
+        offset = offset,
+        limit = limit,
+        messageId = callbackQuery.message?.messageId
+    )
+
+    bot.answerCallbackQuery(callbackQuery.id)
+}
+
+private fun showSearchPageCommon(
+    bot: Bot,
+    chatId: ChatId,
+    queryText: String,
+    queryHash: String,
+    offset: Int,
+    limit: Int = 10,
+    messageId: Long? = null,
+    replyToMessageId: Long? = null,
+) {
+    try {
+        val total = IndexedDocumentsDao.countSearchResults(queryText)
+        val searchResults = IndexedDocumentsDao.searchWithSnippet(queryText, limit = limit, offset = offset)
+
+        val resultHeaderText = """
+            |*Результаты поиска по запросу* `${queryText.escapeMarkdownV2()}`:
+            |_Показаны результаты с ${offset + 1} по ${minOf(offset + limit, total.toInt())} из ${total}_
+            |
+            |
+        """.trimMargin()
+        val resultListText = if (searchResults.isNotEmpty()) {
+            searchResults.joinToString("\n") { res ->
+                "\\- *${res.second.escapeMarkdownV2()}* \n${formatSnippetForMarkdownV2(res.third)}\n"
+            }
+        } else {
+            "_Поиск не дал результатов\\._"
+        }
+
+        // Prepare download list for buttons: List<Pair<Hash, Filename>>
+        val downloadHashes = searchResults.map { it.first to it.second }
+
+        val keyboard = buildSearchResultsButtons(
+            offset = offset,
+            limit = limit,
+            total = total.toInt(),
+            searchKey = "searchDocs:$queryHash", // Append hash for pagination lookup
+            downloadHashes = downloadHashes
+        )
+
+        val fullText = resultHeaderText + resultListText
+
+        if (messageId != null) {
+            bot.editMessageText(
+                chatId = chatId,
+                messageId = messageId,
+                text = fullText,
+                parseMode = ParseMode.MARKDOWN_V2,
+                replyMarkup = keyboard
+            )
+        } else {
+            bot.sendMessage(
+                chatId = chatId,
+                text = fullText,
+                replyToMessageId = replyToMessageId,
+                parseMode = ParseMode.MARKDOWN_V2,
+                replyMarkup = keyboard
+            )
+        }
+    } catch (e: Exception) {
+        bot.sendMessage(
+            chatId = chatId,
+            text = "_При выполнении поиска произошла ошибка\\._",
+            replyToMessageId = replyToMessageId,
+            parseMode = ParseMode.MARKDOWN_V2
+        )
+    }
+}
+
+fun buildPaginationButtonsFull(offset: Int, total: Int, key: String): InlineKeyboardMarkup {
+    val row = buildPaginationButtonsRow(offset = offset, limit = USERS_PAGE_SIZE, total = total, key = key)
+    val buttons = listOf(row)
+
+    return InlineKeyboardMarkup.create(buttons)
+}
+
+fun buildSearchResultsButtons(
+    offset: Int,
+    limit: Int,
+    total: Int,
+    searchKey: String = "searchDocs",
+    downloadKey: String = "downloadDoc",
+    downloadHashes: List<Pair<String, String>> = emptyList(),
+): InlineKeyboardMarkup {
     val buttons = mutableListOf<List<InlineKeyboardButton>>()
+
+    if (total > SEARCH_PAGE_SIZE) {
+        val paginationRow = buildPaginationButtonsRow(
+            offset = offset,
+            limit = limit,
+            total = total,
+            key = searchKey,
+            showLimit = true,
+        )
+
+        buttons += paginationRow
+    }
+
+    downloadHashes.forEach { (hash, path) ->
+        val button = InlineKeyboardButton.CallbackData(
+            text = "⬇ $path",
+            callbackData = "$downloadKey:$hash"
+        )
+        buttons += listOf(button)
+    }
+
+    return InlineKeyboardMarkup.create(buttons)
+}
+
+private fun buildPaginationButtonsRow(
+    offset: Int, limit: Int, total: Int, key: String, showLimit: Boolean = false
+): List<InlineKeyboardButton> {
+    val prevOffset = maxOf(offset - limit, 0)
+    val nextOffset = offset + limit
 
     val row = mutableListOf<InlineKeyboardButton>()
 
     row += if (offset > 0) {
         InlineKeyboardButton.CallbackData(
             text = "◀",
-            callbackData = "$key:$prevOffset",
+            callbackData = if (showLimit) "$key:$prevOffset:$limit" else "$key:$prevOffset",
         )
     } else {
         InlineKeyboardButton.CallbackData(text = "🚫", callbackData = "noop")
     }
 
-    if (total > USERS_PAGE_SIZE) {
+    if (total > limit) {
         row += InlineKeyboardButton.CallbackData(
             text = "${offset + 1}…${min(nextOffset, total)}",
             callbackData = "noop",
@@ -199,15 +363,11 @@ fun buildPaginationButtons(offset: Int, total: Int, key: String): InlineKeyboard
     row += if (nextOffset < total) {
         InlineKeyboardButton.CallbackData(
             text = "▶",
-            callbackData = "$key:$nextOffset",
+            callbackData = if (showLimit) "$key:$nextOffset:$limit" else "$key:$nextOffset",
         )
     } else {
         InlineKeyboardButton.CallbackData(text = "🚫", callbackData = "noop")
     }
 
-    if (row.isNotEmpty()) {
-        buttons += row
-    }
-
-    return InlineKeyboardMarkup.create(buttons)
+    return row
 }

@@ -85,6 +85,19 @@ fun md5(input: String): String {
         .padStart(32, '0')
 }
 
+fun formatSnippetForMarkdownV2(snippet: String): String {
+    return snippet
+        .lines()
+        .filter { it.isNotBlank() }
+        .joinToString("\n") { line ->
+            "> " + line
+                .trim()
+                .escapeMarkdownV2()
+                .replace("<b\\>", "*")
+                .replace("</b\\>", "*")
+        }
+}
+
 fun localizeRole(userRole: UserRole): String {
     return when (userRole) {
         UserRole.GUEST -> "гость"

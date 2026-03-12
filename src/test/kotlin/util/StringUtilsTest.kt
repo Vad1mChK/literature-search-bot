@@ -56,4 +56,33 @@ class StringUtilsTest {
             assert(result.matches(md5Regex))
         }
     }
+
+    @Test
+    fun testFormatSnippetForMarkdownV2() {
+        val testCases = mapOf(
+            """
+            |Professor <b>Wang Miao</b> is the one who
+            |uncovered the mystery of sophons.
+            """.trimMargin() to
+                """
+                |> Professor *Wang Miao* is the one who
+                |> uncovered the mystery of sophons\.
+                """.trimMargin(),
+            """
+            |Policeman <b>Shi Qiang</b> assisted him
+            |in this predicament.
+            |
+            |Chapter VII
+            """.trimMargin() to
+                """
+                |> Policeman <b>Shi Qiang</b> assisted him
+                |> in this predicament\.
+                |> Chapter VII
+                """.trimMargin(),
+        )
+
+        testCases.forEach { (input, expected) ->
+            assertEquals(expected, formatSnippetForMarkdownV2(input))
+        }
+    }
 }

@@ -54,7 +54,7 @@ object BotContext {
     fun initializeHandlers() {
         bot = bot {
             token = LSB_BOT_TOKEN
-            logLevel = LogLevel.Network.Body
+            logLevel = LogLevel.Network.Headers
 
             dispatch {
                 callbackQuery {

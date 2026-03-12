@@ -5,11 +5,14 @@ import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.vad1mchk.litsearchbot.auth.RegisterStatus
 import com.vad1mchk.litsearchbot.auth.UserRole
+import com.vad1mchk.litsearchbot.bot.BotContext
+import com.vad1mchk.litsearchbot.database.IndexedDocumentsDao
 import com.vad1mchk.litsearchbot.database.RegisterRequestDao
 import com.vad1mchk.litsearchbot.database.UserDao
 import com.vad1mchk.litsearchbot.util.CommandHandler
 import com.vad1mchk.litsearchbot.util.breakdownCommand
 import com.vad1mchk.litsearchbot.util.escapeMarkdownV2
+import com.vad1mchk.litsearchbot.util.formatSnippetForMarkdownV2
 import com.vad1mchk.litsearchbot.util.fullName
 import com.vad1mchk.litsearchbot.util.localizeRole
 import com.vad1mchk.litsearchbot.util.toChatId
@@ -227,13 +230,19 @@ object Commands {
     }
 
     private val search: CommandHandler = command@{
-        // TODO implement
-        bot.sendMessage(
-            chatId = message.chat.id.toChatId(),
-            text = "_🚧 Эта команда пока не реализована\\._",
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyToMessageId = message.messageId,
-        )
+        // TODO implement properly and add button menu
+        val searchQuery = message.text?.breakdownCommand(maxArgs = 0)?.getOrNull(1)?.trim()
+        if (searchQuery.isNullOrBlank()) {
+            bot.sendMessage(
+                message.chat.id.toChatId(),
+                "_${"Укажите поисковой запрос после названия команды.".escapeMarkdownV2()}_",
+                replyToMessageId = message.messageId,
+                parseMode = ParseMode.MARKDOWN_V2,
+            )
+            return@command
+        }
+
+        showSearchPage(searchQuery)
     }
 
     private val adminListUsers: CommandHandler = command@{
@@ -487,20 +496,97 @@ object Commands {
     }
 
     private val adminReindex: CommandHandler = command@{
-        // TODO implement
-        bot.sendMessage(
+        val newMessage = bot.sendMessage(
             chatId = message.chat.id.toChatId(),
-            text = "_🚧 Эта команда пока не реализована\\._",
+            text = "⌛ _Реиндексация в процессе_ \\(подготовка…\\)",
             parseMode = ParseMode.MARKDOWN_V2,
             replyToMessageId = message.messageId,
         )
+        val newMessageId = newMessage.getOrNull()?.messageId
+        var resultMessageText = ""
+
+        try {
+            val stats = BotContext.indexingService.reindex { current, total ->
+                val emoji = if (current % 2 == 0) "⏳" else "⌛️"
+                if (newMessageId != null) {
+                    bot.editMessageText(
+                        chatId = message.chat.id.toChatId(),
+                        messageId = newMessageId,
+                        text = "$emoji _Реиндексация в процессе_ \\($current/$total\\)",
+                        parseMode = ParseMode.MARKDOWN_V2,
+                    )
+                }
+            }
+            resultMessageText = """
+            |✅ _Реиндексация завершена\._
+            |\- Актуальные: ${stats.upToDate}
+            |\- Обновлено: ${stats.updated}
+            |\- Добавлено: ${stats.added}
+            |\- Удалено: ${stats.deleted}
+            |\- Не удалось обработать: ${stats.failed}
+            """.trimMargin()
+
+        } catch (e: Exception) {
+            resultMessageText =
+                "❌ _При индексации произошла ошибка:_ `${e.message?.escapeMarkdownV2() ?: "неизвестная ошибка"}`"
+        }
+
+
+        if (newMessageId != null) {
+            bot.editMessageText(
+                chatId = message.chat.id.toChatId(),
+                messageId = newMessageId,
+                text = resultMessageText,
+                parseMode = ParseMode.MARKDOWN_V2,
+            )
+        } else {
+            bot.sendMessage(
+                chatId = message.chat.id.toChatId(),
+                replyToMessageId = message.messageId,
+                text = resultMessageText,
+                parseMode = ParseMode.MARKDOWN_V2,
+            )
+        }
     }
 
     private val adminIndexInfo: CommandHandler = command@{
-        // TODO implement
+        val stats = BotContext.indexingService.computeTotalStats()
+        val statsByCategory = mapOf(
+            "Актуальные" to stats.upToDate,
+            "Устаревшие" to stats.outdated,
+            "Исчезнувшие" to stats.disappeared,
+            "Не индексированы" to stats.unindexed,
+        )
+            .filter { it.value != 0 }
+            .map { "\\- ${it.key}: ${it.value}" }
+            .joinToString("\n")
+
+        val warningText = if (stats.disappeared != 0 || stats.unindexed != 0) {
+            "⚠ Список файлов в индексе отличается от списка файлов на диске!"
+        } else if (stats.outdated != 0) {
+            "⚠ Представления некоторых файлов в индексе устарели!"
+        } else {
+            null
+        }
+        val reindexText = "Запустите реиндексацию командой /a_reindex."
+
+        val resultMessageText = """
+        |🏗 _Информация об индексе:_
+        |$statsByCategory
+        |
+        |\- Всего файлов на диске: ${stats.totalOnDisk}
+        |\- Всего файлов в базе данных: ${stats.totalInDatabase}
+        |
+        |${ 
+            if (warningText != null) 
+                ("> *${warningText.escapeMarkdownV2()}*\n> *${reindexText.escapeMarkdownV2()}*") 
+                else ""
+        }
+        """.trimMargin()
+
         bot.sendMessage(
             chatId = message.chat.id.toChatId(),
-            text = "_🚧 Эта команда пока не реализована\\._",
+            text = resultMessageText,
             parseMode = ParseMode.MARKDOWN_V2,
             replyToMessageId = message.messageId,
         )
