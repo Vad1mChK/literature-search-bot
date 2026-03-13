@@ -2,18 +2,18 @@ package com.vad1mchk.litsearchbot.database
 
 import com.vad1mchk.litsearchbot.database.entity.SearchQueryLookups
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 
 object SearchQueryLookupDao {
-    private const val MAX_CAPACITY = 1024
+    const val DEFAULT_MAX_CAPACITY = 1024
+    var maxCapacity = DEFAULT_MAX_CAPACITY
 
     /**
      * Finds a query by its hash and updates the [lastUsedAt] timestamp.
      */
-    fun findByHash(hash: String): String? = transaction {
+    fun findByHash(hash: String, at: Long = Instant.now().toEpochMilli()): String? = transaction {
         val row = SearchQueryLookups
             .select(SearchQueryLookups.queryText)
             .where { SearchQueryLookups.queryHash eq hash }
@@ -21,7 +21,7 @@ object SearchQueryLookupDao {
 
         if (row != null) {
             val text = row[SearchQueryLookups.queryText]
-            updateTimestamp(hash)
+            updateTimestamp(hash, at)
             text
         } else {
             null
@@ -29,10 +29,10 @@ object SearchQueryLookupDao {
     }
 
     /**
-     * Inserts or updates a query, ensuring the table does not exceed [MAX_CAPACITY].
+     * Inserts or updates a query, ensuring the table does not exceed [maxCapacity].
      */
-    fun upsertQuery(hash: String, text: String) = transaction {
-        val now = Instant.now().toEpochMilli()
+    fun upsertQuery(hash: String, text: String, usedAt: Long? = null) = transaction {
+        val now = usedAt ?: Instant.now().toEpochMilli()
 
         val updatedCount = SearchQueryLookups.update({ SearchQueryLookups.queryHash eq hash }) {
             it[queryText] = text
@@ -50,15 +50,15 @@ object SearchQueryLookupDao {
         }
     }
 
-    private fun updateTimestamp(hash: String) {
+    private fun updateTimestamp(hash: String, at: Long = Instant.now().toEpochMilli()) {
         SearchQueryLookups.update({ SearchQueryLookups.queryHash eq hash }) {
-            it[SearchQueryLookups.lastUsedAt] = Instant.now().toEpochMilli()
+            it[SearchQueryLookups.lastUsedAt] = at
         }
     }
 
     private fun ensureCapacity(requiredSpace: Int) {
         val currentCount = SearchQueryLookups.selectAll().count()
-        val overflow = (currentCount + requiredSpace) - MAX_CAPACITY
+        val overflow = (currentCount + requiredSpace) - maxCapacity
 
         if (overflow > 0) {
             // Select the hashes of the N oldest entries to delete

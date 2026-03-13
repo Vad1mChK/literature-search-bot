@@ -1,75 +1,116 @@
 package com.vad1mchk.litsearchbot.documents
 
-import org.junit.jupiter.api.BeforeAll
+import com.vad1mchk.litsearchbot.database.DatabaseTestBase
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
-import kotlin.test.assertTrue
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
-class IndexingServiceTest {
-    companion object {
-        private lateinit var indexingService: IndexingService
-        private lateinit var literatureDir: File
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class IndexingServiceTest : DatabaseTestBase() {
+    @TempDir
+    lateinit var tempDir: Path
 
-        @JvmStatic
-        @BeforeAll
-        fun setupTests(
-            @TempDir tempDir: Path,
-        ) {
-            // Create a subfolder in the temp directory for literature
-            val litPath = tempDir.resolve("literature").createDirectories()
+    private lateinit var literatureDir: File
+    private lateinit var indexingService: IndexingService
 
-            // Copy files from resources to the temp directory
-            listOf("testTxt.txt", "testDocx.docx", "testPdf.pdf").forEach { fileName ->
-                val resourceStream = this::class.java.classLoader.getResourceAsStream("literature/$fileName")
-                    ?: throw IllegalStateException("Resource $fileName not found")
+    val emptyLambda: (Int, Int) -> Unit = { _, _ -> }
 
-                val target = litPath.resolve(fileName)
-                resourceStream.use { input ->
-                    java.nio.file.Files.copy(input, target)
-                }
-            }
-
-            literatureDir = litPath.toFile()
-            indexingService = IndexingService(literatureDir.absolutePath)
+    @BeforeEach
+    fun setupTests() {
+        val litPath = tempDir.resolve("literature")
+        if (!Files.exists(litPath)) {
+            litPath.createDirectories()
         }
+
+        listOf("testTxt.txt", "testDocx.docx", "testPdf.pdf").forEach { fileName ->
+            val resourceStream = javaClass.classLoader.getResourceAsStream("literature/$fileName")
+                ?: throw IllegalStateException("Resource $fileName not found")
+
+            val target = litPath.resolve(fileName)
+            resourceStream.use { input ->
+                Files.copy(input, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+
+        literatureDir = litPath.toFile()
+        indexingService = IndexingService(literatureDir.absolutePath)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "testTxt.txt,Lorem ipsum dolor sit amet txt",
+        "testPdf.pdf,Lorem ipsum dolor sit amet pdf",
+        "testDocx.docx,Lorem ipsum dolor sit amet docx",
+    )
+    fun extractText_shouldReadSupportedFiles(fileName: String, expectedText: String) {
+        val file = File(literatureDir, fileName)
+        val content = indexingService.extractText(file)
+
+        assertNotNull(content)
+        assertContains(content, expectedText)
     }
 
     @Test
-    fun testTextExtractionFromTxt() {
-        val file = File(literatureDir, "testTxt.txt")
-        val content = indexingService.extractText(file)
+    fun reindex_afterAddingNewTextFile_deltaShouldCountAddedFile() {
+        indexingService.reindex(emptyLambda)
+        val file = literatureDir.resolve("addFile.txt")
+        file.writeText("Lorem Ipsum Dolor Sit Amet")
 
-        assertTrue(content != null, "Content should not be null")
-        assertTrue(
-            content.contains("Lorem ipsum dolor sit amet txt"),
-            "Content was: $content",
-        )
+        val deltaStats = indexingService.reindex(emptyLambda)
+        assertEquals(1, deltaStats.added)
+        assertEquals(0, deltaStats.updated)
+        assertEquals(0, deltaStats.deleted)
+        file.delete()
     }
 
     @Test
-    fun testTextExtractionFromPdf() {
-        val file = File(literatureDir, "testPdf.pdf")
-        val content = indexingService.extractText(file)
+    fun reindex_afterDeletingTextFile_deltaShouldCountDeletedFile() {
+        val file = literatureDir.resolve("deleteFile.txt")
+        file.writeText("Lorem Ipsum Dolor Sit Amet")
+        indexingService.reindex(emptyLambda)
 
-        assertTrue(content != null, "Content should not be null")
-        assertTrue(
-            content.contains("Lorem ipsum dolor sit amet pdf"),
-            "Content was: $content",
-        )
+        file.delete()
+
+        val deltaStats = indexingService.reindex(emptyLambda)
+        assertEquals(0, deltaStats.added)
+        assertEquals(0, deltaStats.updated)
+        assertEquals(1, deltaStats.deleted)
     }
 
     @Test
-    fun testTextExtractionFromDocx() {
-        val file = File(literatureDir, "testDocx.docx")
-        val content = indexingService.extractText(file)
+    fun computeTotalStats_afterDeletingFileOnDiskWithoutReindex_totalShouldCountDisappearedFile() {
+        val file = literatureDir.resolve("deleteFile.txt")
+        file.writeText("Lorem Ipsum Dolor Sit Amet")
+        indexingService.reindex(emptyLambda)
 
-        assertTrue(content != null, "Content should not be null")
-        assertTrue(
-            content.contains("Lorem ipsum dolor sit amet docx"),
-            "Content was: $content",
-        )
+        file.delete()
+
+        val totalStats = indexingService.computeTotalStats()
+        assertEquals(1, totalStats.disappeared)
+        assertEquals(-1, totalStats.totalOnDisk - totalStats.totalInDatabase)
+    }
+
+    @Test
+    fun computeTotalStats_afterAddingFileOnDiskWithoutReindex_totalShouldCountUnindexedFile() {
+        indexingService.reindex(emptyLambda)
+
+        val file = literatureDir.resolve("deleteFile.txt")
+        file.writeText("Lorem Ipsum Dolor Sit Amet")
+
+        val totalStats = indexingService.computeTotalStats()
+        assertEquals(1, totalStats.unindexed)
+        assertEquals(1, totalStats.totalOnDisk - totalStats.totalInDatabase)
+
+        file.delete()
     }
 }
