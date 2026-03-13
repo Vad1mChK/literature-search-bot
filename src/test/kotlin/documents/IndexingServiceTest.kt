@@ -38,7 +38,7 @@ class IndexingServiceTest {
     }
 
     @Test
-    fun `test text extraction from TXT`() {
+    fun testTextExtractionFromTxt() {
         val file = File(literatureDir, "testTxt.txt")
         val content = indexingService.extractText(file)
 
@@ -50,7 +50,7 @@ class IndexingServiceTest {
     }
 
     @Test
-    fun `test text extraction from PDF`() {
+    fun testTextExtractionFromPdf() {
         val file = File(literatureDir, "testPdf.pdf")
         val content = indexingService.extractText(file)
 
@@ -62,7 +62,7 @@ class IndexingServiceTest {
     }
 
     @Test
-    fun `test text extraction from DOCX`() {
+    fun testTextExtractionFromDocx() {
         val file = File(literatureDir, "testDocx.docx")
         val content = indexingService.extractText(file)
 
