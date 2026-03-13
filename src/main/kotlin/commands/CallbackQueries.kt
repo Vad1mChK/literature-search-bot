@@ -3,7 +3,6 @@ package com.vad1mchk.litsearchbot.commands
 import com.github.kotlintelegrambot.entities.ChatAction
 import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.TelegramFile
-import com.github.kotlintelegrambot.entities.files.File
 import com.vad1mchk.litsearchbot.auth.UserRole
 import com.vad1mchk.litsearchbot.bot.BotContext
 import com.vad1mchk.litsearchbot.database.IndexedDocumentsDao
@@ -45,7 +44,7 @@ object CallbackQueries {
                 chatId = callbackMessage.chat.id.toChatId(),
                 text = "❌ _Запрашиваемый документ не найден в базе данных\\._",
                 replyToMessageId = callbackMessage.messageId,
-                parseMode = ParseMode.MARKDOWN_V2
+                parseMode = ParseMode.MARKDOWN_V2,
             )
             bot.answerCallbackQuery(callbackQuery.id, "Произошла ошибка", showAlert = true)
             return@callback
@@ -57,7 +56,7 @@ object CallbackQueries {
                 chatId = callbackMessage.chat.id.toChatId(),
                 text = "❌ _Запрашиваемый документ не существует на диске\\._",
                 replyToMessageId = callbackMessage.messageId,
-                parseMode = ParseMode.MARKDOWN_V2
+                parseMode = ParseMode.MARKDOWN_V2,
             )
             bot.answerCallbackQuery(callbackQuery.id, "Произошла ошибка", showAlert = true)
             return@callback
@@ -75,7 +74,7 @@ object CallbackQueries {
                     ⌛ _Выполняется отправка документа, подождите…_
                 """.trimIndent(),
                 parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = callbackMessage.messageId
+                replyToMessageId = callbackMessage.messageId,
             )
 
             if (document.telegramFileId != null) {
@@ -84,7 +83,7 @@ object CallbackQueries {
                     document = TelegramFile.ByFileId(document.telegramFileId),
                     caption = "📄 *${document.original.escapeMarkdownV2()}*",
                     parseMode = ParseMode.MARKDOWN_V2,
-                    replyToMessageId = callbackMessage.messageId
+                    replyToMessageId = callbackMessage.messageId,
                 )
             } else {
                 // 2. Fallback to upload + save file_id
@@ -96,7 +95,7 @@ object CallbackQueries {
                     document = fileToUpload,
                     caption = "📄 *${document.original.escapeMarkdownV2()}*",
                     parseMode = ParseMode.MARKDOWN_V2,
-                    replyToMessageId = callbackMessage.messageId
+                    replyToMessageId = callbackMessage.messageId,
                 )
 
                 // Extract and save file_id from the successful response
@@ -109,7 +108,7 @@ object CallbackQueries {
                 chatId = callbackMessage.chat.id.toChatId(),
                 text = "❌ _Документ был найден, но его не удалось отправить\\._",
                 replyToMessageId = callbackMessage.messageId,
-                parseMode = ParseMode.MARKDOWN_V2
+                parseMode = ParseMode.MARKDOWN_V2,
             )
             bot.answerCallbackQuery(callbackQuery.id, "Произошла ошибка", showAlert = true)
             return@callback

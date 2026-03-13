@@ -82,8 +82,8 @@ class IndexingService(private val literaturePath: String) {
         val totalOnDisk = diskPaths.size
         val totalInDb = dbPaths.size
 
-        val disappeared = (dbPaths - diskPaths).size     // in DB, not on disk
-        val unindexed = (diskPaths - dbPaths).size       // on disk, not in DB
+        val disappeared = (dbPaths - diskPaths).size // in DB, not on disk
+        val unindexed = (diskPaths - dbPaths).size // on disk, not in DB
 
         var upToDate = 0
         var outdated = 0
@@ -105,7 +105,7 @@ class IndexingService(private val literaturePath: String) {
             disappeared = disappeared,
             unindexed = unindexed,
             newestDiskTimestamp = newestDiskTimestamp,
-            newestIndexedTimestamp = newestIndexedTimestamp
+            newestIndexedTimestamp = newestIndexedTimestamp,
         )
     }
 

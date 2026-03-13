@@ -7,7 +7,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object IndexedDocumentsDao {
-
     /**
      * Initializes the FTS5 table and TRIGGERS to keep it in sync automatically.
      * This way, you only ever interact with the main [IndexedDocuments] table.
@@ -17,17 +16,21 @@ object IndexedDocumentsDao {
         exec("CREATE VIRTUAL TABLE IF NOT EXISTS indexed_docs_fts USING fts5(hashsum UNINDEXED, content);")
 
         // 2. Create triggers for automatic Sync (Insert, Update, Delete)
-        exec("""
+        exec(
+            """
             CREATE TRIGGER IF NOT EXISTS fts_insert AFTER INSERT ON indexed_documents BEGIN
                 INSERT INTO indexed_docs_fts(hashsum, content) VALUES (new.hashsum, '');
             END;
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
-        exec("""
+        exec(
+            """
             CREATE TRIGGER IF NOT EXISTS fts_delete AFTER DELETE ON indexed_documents BEGIN
                 DELETE FROM indexed_docs_fts WHERE hashsum = old.hashsum;
             END;
-        """.trimIndent())
+            """.trimIndent(),
+        )
     }
 
     fun getByHashsum(hashsum: String): IndexedDocument? = transaction {
@@ -58,10 +61,13 @@ object IndexedDocumentsDao {
 
         // Since FTS content usually comes from an external parser,
         // we update the FTS table specifically using parameterized exec to avoid injection.
-        exec("UPDATE indexed_docs_fts SET content = ? WHERE hashsum = ?", args = listOf(
-            TextColumnType() to text,
-            TextColumnType() to hash
-        ))
+        exec(
+            "UPDATE indexed_docs_fts SET content = ? WHERE hashsum = ?",
+            args = listOf(
+                TextColumnType() to text,
+                TextColumnType() to hash,
+            ),
+        )
     }
 
     fun updateFileId(hash: String, fileId: String) = transaction {
@@ -100,7 +106,7 @@ object IndexedDocumentsDao {
         FROM indexed_documents d
         JOIN indexed_docs_fts f ON d.hashsum = f.hashsum
         WHERE f.content MATCH ?
-    """.trimIndent()
+        """.trimIndent()
 
         exec(
             stmt = sql,
@@ -113,7 +119,7 @@ object IndexedDocumentsDao {
     fun searchWithSnippet(
         query: String,
         limit: Int = 10,
-        offset: Int = 0
+        offset: Int = 0,
     ): List<Triple<String, String, String>> = transaction {
         val results = mutableListOf<Triple<String, String, String>>()
 
@@ -126,14 +132,14 @@ object IndexedDocumentsDao {
         WHERE indexed_docs_fts.content MATCH ?
         ORDER BY rank
         LIMIT ? OFFSET ?
-    """.trimIndent()
+        """.trimIndent()
 
         exec(
             sql,
             args = listOf(
                 TextColumnType() to query,
                 IntegerColumnType() to limit,
-                IntegerColumnType() to offset
+                IntegerColumnType() to offset,
             ),
         ) { rs ->
             while (rs.next()) {
@@ -141,8 +147,8 @@ object IndexedDocumentsDao {
                     Triple(
                         rs.getString("hashsum"),
                         rs.getString("original"),
-                        rs.getString("excerpt")
-                    )
+                        rs.getString("excerpt"),
+                    ),
                 )
             }
         }

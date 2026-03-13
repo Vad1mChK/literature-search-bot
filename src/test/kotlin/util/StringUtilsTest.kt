@@ -75,7 +75,7 @@ class StringUtilsTest {
             |Chapter VII
             """.trimMargin() to
                 """
-                |> Policeman <b>Shi Qiang</b> assisted him
+                |> Policeman *Shi Qiang* assisted him
                 |> in this predicament\.
                 |> Chapter VII
                 """.trimMargin(),

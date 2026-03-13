@@ -18,18 +18,16 @@ import kotlin.text.split
 
 object BotContext {
     // Env vars
-    @JvmStatic
-    val LSB_BOT_TOKEN: String
-    @JvmStatic
-    val LSB_ADMINS_ON_START: List<Long>
-    @JvmStatic
-    val LSB_DB_PATH: String
-    @JvmStatic
-    val LSB_LITERATURE_PATH: String
+    @JvmStatic val LSB_BOT_TOKEN: String
+
+    @JvmStatic val LSB_ADMINS_ON_START: List<Long>
+
+    @JvmStatic val LSB_DB_PATH: String
+
+    @JvmStatic val LSB_LITERATURE_PATH: String
 
     // App globals
-    @JvmStatic
-    lateinit var bot: Bot
+    @JvmStatic lateinit var bot: Bot
     lateinit var indexingService: IndexingService
 
     init {

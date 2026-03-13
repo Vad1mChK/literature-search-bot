@@ -191,7 +191,7 @@ fun CommandHandlerEnvironment.showSearchPage(query: String) {
         queryHash = hash,
         offset = 0,
         limit = SEARCH_PAGE_SIZE,
-        replyToMessageId = message.messageId
+        replyToMessageId = message.messageId,
     )
 }
 
@@ -222,7 +222,7 @@ fun CallbackQueryHandlerEnvironment.showSearchPageFromCallback() {
         queryHash = queryHash,
         offset = offset,
         limit = limit,
-        messageId = callbackQuery.message?.messageId
+        messageId = callbackQuery.message?.messageId,
     )
 
     bot.answerCallbackQuery(callbackQuery.id)
@@ -263,8 +263,8 @@ private fun showSearchPageCommon(
             offset = offset,
             limit = limit,
             total = total.toInt(),
-            searchKey = "searchDocs:$queryHash", // Append hash for pagination lookup
-            downloadHashes = downloadHashes
+            searchKey = "searchDocs:$queryHash",
+            downloadHashes = downloadHashes,
         )
 
         val fullText = resultHeaderText + resultListText
@@ -275,7 +275,7 @@ private fun showSearchPageCommon(
                 messageId = messageId,
                 text = fullText,
                 parseMode = ParseMode.MARKDOWN_V2,
-                replyMarkup = keyboard
+                replyMarkup = keyboard,
             )
         } else {
             bot.sendMessage(
@@ -283,7 +283,7 @@ private fun showSearchPageCommon(
                 text = fullText,
                 replyToMessageId = replyToMessageId,
                 parseMode = ParseMode.MARKDOWN_V2,
-                replyMarkup = keyboard
+                replyMarkup = keyboard,
             )
         }
     } catch (e: Exception) {
@@ -291,7 +291,7 @@ private fun showSearchPageCommon(
             chatId = chatId,
             text = "_При выполнении поиска произошла ошибка\\._",
             replyToMessageId = replyToMessageId,
-            parseMode = ParseMode.MARKDOWN_V2
+            parseMode = ParseMode.MARKDOWN_V2,
         )
     }
 }
@@ -328,7 +328,7 @@ fun buildSearchResultsButtons(
     downloadHashes.forEach { (hash, path) ->
         val button = InlineKeyboardButton.CallbackData(
             text = "⬇ $path",
-            callbackData = "$downloadKey:$hash"
+            callbackData = "$downloadKey:$hash",
         )
         buttons += listOf(button)
     }
@@ -337,7 +337,11 @@ fun buildSearchResultsButtons(
 }
 
 private fun buildPaginationButtonsRow(
-    offset: Int, limit: Int, total: Int, key: String, showLimit: Boolean = false
+    offset: Int,
+    limit: Int,
+    total: Int,
+    key: String,
+    showLimit: Boolean = false,
 ): List<InlineKeyboardButton> {
     val prevOffset = maxOf(offset - limit, 0)
     val nextOffset = offset + limit

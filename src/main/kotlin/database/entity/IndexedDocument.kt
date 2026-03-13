@@ -1,6 +1,5 @@
 package com.vad1mchk.litsearchbot.database.entity
 
-import com.github.kotlintelegrambot.entities.TelegramFile
 import org.jetbrains.exposed.sql.ResultRow
 
 data class IndexedDocument(

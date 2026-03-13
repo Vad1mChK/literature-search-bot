@@ -6,13 +6,11 @@ import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.vad1mchk.litsearchbot.auth.RegisterStatus
 import com.vad1mchk.litsearchbot.auth.UserRole
 import com.vad1mchk.litsearchbot.bot.BotContext
-import com.vad1mchk.litsearchbot.database.IndexedDocumentsDao
 import com.vad1mchk.litsearchbot.database.RegisterRequestDao
 import com.vad1mchk.litsearchbot.database.UserDao
 import com.vad1mchk.litsearchbot.util.CommandHandler
 import com.vad1mchk.litsearchbot.util.breakdownCommand
 import com.vad1mchk.litsearchbot.util.escapeMarkdownV2
-import com.vad1mchk.litsearchbot.util.formatSnippetForMarkdownV2
 import com.vad1mchk.litsearchbot.util.fullName
 import com.vad1mchk.litsearchbot.util.localizeRole
 import com.vad1mchk.litsearchbot.util.toChatId
@@ -525,12 +523,11 @@ object Commands {
             |\- Удалено: ${stats.deleted}
             |\- Не удалось обработать: ${stats.failed}
             """.trimMargin()
-
         } catch (e: Exception) {
-            resultMessageText =
-                "❌ _При индексации произошла ошибка:_ `${e.message?.escapeMarkdownV2() ?: "неизвестная ошибка"}`"
+            resultMessageText = "❌ _При индексации произошла ошибка:_ `${
+                e.message?.escapeMarkdownV2() ?: "неизвестная ошибка"
+            }`"
         }
-
 
         if (newMessageId != null) {
             bot.editMessageText(
@@ -577,10 +574,12 @@ object Commands {
         |\- Всего файлов на диске: ${stats.totalOnDisk}
         |\- Всего файлов в базе данных: ${stats.totalInDatabase}
         |
-        |${ 
-            if (warningText != null) 
-                ("> *${warningText.escapeMarkdownV2()}*\n> *${reindexText.escapeMarkdownV2()}*") 
-                else ""
+        |${
+            if (warningText != null) {
+                ("> *${warningText.escapeMarkdownV2()}*\n> *${reindexText.escapeMarkdownV2()}*")
+            } else {
+                ""
+            }
         }
         """.trimMargin()
 
