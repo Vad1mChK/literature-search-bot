@@ -11,5 +11,3 @@ LSB_ADMINS_ON_START=1234567890,1234567891
 LSB_DB_PATH=/data/database.db
 # LSB_LITERATURE_PATH: Path to the directory with literature (TXT, DOCX, ...)
 LSB_LITERATURE_PATH=/data/literature/
-# LSB_TEXTINDEX_PATH: Path to the directory with text index (parsed text organized for search)
-LSB_TEXTINDEX_PATH=/data/literature/.textindex/

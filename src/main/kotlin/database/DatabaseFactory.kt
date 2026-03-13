@@ -1,6 +1,8 @@
 package com.vad1mchk.litsearchbot.database
 
+import com.vad1mchk.litsearchbot.database.entity.IndexedDocuments
 import com.vad1mchk.litsearchbot.database.entity.RegisterRequests
+import com.vad1mchk.litsearchbot.database.entity.SearchQueryLookups
 import com.vad1mchk.litsearchbot.database.entity.Users
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -15,11 +17,11 @@ object DatabaseFactory {
 
         transaction {
             // Create tables if they don't exist
-            SchemaUtils.create(Users, RegisterRequests)
-
+            SchemaUtils.create(Users, RegisterRequests, IndexedDocuments, SearchQueryLookups)
+            IndexedDocumentsDao.initFts()
             //
         }
 
-        logger.info("Database tables created: Users, AuthRequests")
+        logger.info("Database tables created: Users, RegisterRequests, IndexedDocuments, SearchQueryLookups")
     }
 }
