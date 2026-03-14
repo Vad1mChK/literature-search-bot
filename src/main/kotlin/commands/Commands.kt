@@ -12,92 +12,67 @@ import com.vad1mchk.litsearchbot.util.CommandHandler
 import com.vad1mchk.litsearchbot.util.breakdownCommand
 import com.vad1mchk.litsearchbot.util.escapeMarkdownV2
 import com.vad1mchk.litsearchbot.util.fullName
-import com.vad1mchk.litsearchbot.util.localizeRole
 import com.vad1mchk.litsearchbot.util.toChatId
 
 object Commands {
     private val start: CommandHandler = command@{
-        val text = "_${"Добро пожаловать, я бот по поиску литературы!".escapeMarkdownV2()}_"
-        val inlineKeyboardMarkup = InlineKeyboardMarkup.create(
+        val text = """
+        |Добро пожаловать, я бот по поиску литературы\!
+        |Чтобы начать, введите команду /search и поисковой запрос
+        |\(т\. е\. `${"/search <query...>"}`\)\.
+        """.trimMargin()
+        val markup = InlineKeyboardMarkup.create(
             listOf(
-                listOf(
-                    InlineKeyboardButton.CallbackData(
-                        text = "🎃",
-                        callbackData = "pumpkin",
-                    ),
-                    InlineKeyboardButton.CallbackData(
-                        text = "👻",
-                        callbackData = "ghost",
-                    ),
-                    InlineKeyboardButton.CallbackData(
-                        text = "🏗",
-                        callbackData = "crane",
-                    ),
-                ),
+                listOf(InlineKeyboardButton.CallbackData("❓ Справка", "help")),
+                listOf(InlineKeyboardButton.CallbackData("👤 О пользователе", "whoami")),
             ),
         )
-        sendReplyMessage(text, replyMarkup = inlineKeyboardMarkup)
+        sendReplyMessage(text, replyMarkup = markup)
     }
 
     private val help: CommandHandler = command@{
-        val fromUser = message.from
-        if (fromUser == null) {
+        val fromUser = message.from ?: run {
             sendReplyMessage("_Ошибка: отправитель команды неизвестен\\._")
             return@command
         }
 
-        val argsList = message.text?.breakdownCommand()
-        if (argsList.isNullOrEmpty()) {
+        val argsList = message.text?.breakdownCommand() ?: run {
             sendReplyMessage("_Ошибка: при распознавании команды не предоставлен текст\\._")
             return@command
         }
+
+        // Check if user requested help for a specific command: /help search
         if (argsList.size > 1) {
-            val commandName = argsList[1]
-            val commandCandidate = allCommands.find { cmd -> cmd.commandName == commandName }
-            if (commandCandidate == null) {
-                sendReplyMessage("_Команда с названием:_ `${commandName.escapeMarkdownV2()}` _не найдена\\._")
-                return@command
-            }
-
-            sendReplyMessage(commandCandidate.toHelpString())
-            return@command
+            helpForCommandHelper(
+                bot = bot,
+                chatId = message.chat.id.toChatId(),
+                commandName = argsList[1],
+                replyToId = message.messageId,
+                allCommands = allCommands,
+            )
+        } else {
+            helpHelper(
+                bot = bot,
+                chatId = message.chat.id.toChatId(),
+                userId = fromUser.id,
+                replyToId = message.messageId,
+                allCommands = allCommands,
+            )
         }
-
-        val currentRole = UserDao.getRole(fromUser.id) ?: UserRole.GUEST
-        val helpText = (
-            "*Список доступных команд:*\n" +
-                allCommands
-                    .filter { cmd -> cmd.permitsRole(currentRole) }
-                    .sortedWith(compareBy<BotCommand> { it.minRole }.thenBy { it.commandName })
-                    .map { cmd ->
-                        "/${cmd.commandName.escapeMarkdownV2()}${cmd.args?.let { " `${it.escapeMarkdownV2()}`" } ?: ""}: " +
-                            cmd.description.escapeMarkdownV2()
-                    }
-                    .joinToString("\n")
-        )
-        sendReplyMessage(helpText)
     }
 
     private val whoami: CommandHandler = command@{
-        val fromUser = message.from
-        if (fromUser == null) {
+        val fromUser = message.from ?: run {
             sendReplyMessage("_Ошибка: отправитель команды неизвестен\\._")
             return@command
         }
 
-        val userExists = UserDao.existsUser(fromUser.id)
-        val userRole = UserDao.getRole(fromUser.id) ?: UserRole.GUEST
-
-        val text = """
-        |*Информация о пользователе*:
-        |\- ID: ${fromUser.id}
-        |\- Никнейм: ${fromUser.username?.escapeMarkdownV2() ?: "неизвестно"}
-        |\- Полное имя: ${(fromUser.fullName).escapeMarkdownV2()}
-        |\- Роль: ${localizeRole(userRole).escapeMarkdownV2()}
-        |
-        |Данные об этом пользователе *${if (userExists) "сохранены" else "не сохранены"}*\.
-        """.trimMargin()
-        sendReplyMessage(text)
+        whoamiHelper(
+            bot = bot,
+            chatId = message.chat.id.toChatId(),
+            user = fromUser,
+            replyToId = message.messageId,
+        )
     }
 
     private val register: CommandHandler = command@{
@@ -457,7 +432,7 @@ object Commands {
             handler = Commands.search,
             args = "<query...>",
             detailedDescription = """
-                |Выполняет поиск по литературе, используя заданный запрос\.
+                |Выполняет полнотекстовый поиск по литературе, используя заданный запрос\.
                 |Результаты выводятся с пагинацией и кнопками\.
             """.trimMargin(),
         ),

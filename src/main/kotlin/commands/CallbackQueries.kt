@@ -13,6 +13,51 @@ import java.nio.file.Files
 import kotlin.io.path.Path
 
 object CallbackQueries {
+    private val help: CallbackQueryHandler = callback@{
+        val user = callbackQuery.from
+        val message = callbackQuery.message ?: return@callback
+
+        helpHelper(
+            bot = bot,
+            chatId = message.chat.id.toChatId(),
+            userId = user.id,
+            replyToId = message.messageId,
+            allCommands = Commands.allCommands,
+        )
+
+        bot.answerCallbackQuery(callbackQuery.id)
+    }
+
+    private val helpForCommand: CallbackQueryHandler = callback@{
+        val message = callbackQuery.message ?: return@callback
+
+        val commandName = callbackQuery.data.split(":").getOrNull(1) ?: return@callback
+
+        helpForCommandHelper(
+            bot = bot,
+            chatId = message.chat.id.toChatId(),
+            replyToId = message.messageId,
+            commandName = commandName,
+            allCommands = Commands.allCommands,
+        )
+
+        bot.answerCallbackQuery(callbackQuery.id)
+    }
+
+    private val whoami: CallbackQueryHandler = callback@{
+        val user = callbackQuery.from
+        val callbackMessage = callbackQuery.message ?: return@callback
+
+        whoamiHelper(
+            bot = bot,
+            chatId = callbackMessage.chat.id.toChatId(),
+            user = user,
+            replyToId = callbackMessage.messageId,
+        )
+
+        bot.answerCallbackQuery(callbackQuery.id)
+    }
+
     private val listUsers: CallbackQueryHandler = callback@{
         val args = callbackQuery.data.split(":")
         val offset = args.getOrNull(1)?.toIntOrNull() ?: return@callback
@@ -119,6 +164,9 @@ object CallbackQueries {
     }
 
     val allCallbackQueries = listOf(
+        BotCallbackQuery("help", UserRole.GUEST, help),
+        BotCallbackQuery("helpForCommand", UserRole.GUEST, helpForCommand),
+        BotCallbackQuery("whoami", UserRole.GUEST, whoami),
         BotCallbackQuery("searchDocs", UserRole.REGULAR, searchDocs),
         BotCallbackQuery("downloadDoc", UserRole.REGULAR, downloadDoc),
         BotCallbackQuery("listUsers", UserRole.ADMIN, listUsers),
