@@ -8,6 +8,6 @@ LSB_BOT_TOKEN=0123456789ABCDEF
 # LSB_ADMINS_ON_START: Telegram IDs of admins that should be added on start (separator: comma without space)
 LSB_ADMINS_ON_START=1234567890,1234567891
 # LSB_DB_PATH: Path to the SQLite database file
-LSB_DB_PATH=/data/database.db
+LSB_DB_PATH=./data/database.db
 # LSB_LITERATURE_PATH: Path to the directory with literature (TXT, DOCX, ...)
-LSB_LITERATURE_PATH=/data/literature/
+LSB_LITERATURE_PATH=./data/literature/

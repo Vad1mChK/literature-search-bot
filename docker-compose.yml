@@ -1,0 +1,10 @@
+services:
+  lit-search-bot:
+    build: .
+    container_name: lit-search-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - /home/somebody/Documents/literature:/app/data/literature:ro
