@@ -50,13 +50,23 @@ object IndexedDocumentsDao {
         IndexedDocuments.deleteWhere { original eq relativePath }
     }
 
-    fun updateDocument(hash: String, path: String, ext: String, lastModified: Long, text: String) = transaction {
+    fun updateDocument(
+        hash: String,
+        path: String,
+        ext: String,
+        lastModified: Long,
+        text: String,
+        dropTelegramFileId: Boolean = true
+    ) = transaction {
         IndexedDocuments.upsert {
             it[hashsum] = hash
             it[original] = path
             it[mode] = ext.uppercase()
             it[extractedAt] = System.currentTimeMillis() / 1000
             it[lastModifiedAt] = lastModified
+            if (dropTelegramFileId) {
+                it[telegramFileId] = null
+            }
         }
 
         // Since FTS content usually comes from an external parser,
