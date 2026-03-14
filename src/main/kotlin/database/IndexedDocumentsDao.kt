@@ -56,7 +56,7 @@ object IndexedDocumentsDao {
         ext: String,
         lastModified: Long,
         text: String,
-        dropTelegramFileId: Boolean = true
+        dropTelegramFileId: Boolean = true,
     ) = transaction {
         IndexedDocuments.upsert {
             it[hashsum] = hash

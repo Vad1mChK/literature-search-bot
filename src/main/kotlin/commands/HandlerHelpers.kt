@@ -26,7 +26,7 @@ fun Bot.sendSafeReply(
     replyToId: Long?,
     text: String,
     parseMode: ParseMode? = ParseMode.MARKDOWN_V2,
-    replyMarkup: ReplyMarkup? = null
+    replyMarkup: ReplyMarkup? = null,
 ) = sendMessage(
     chatId = chatId,
     text = text,
@@ -38,7 +38,7 @@ fun Bot.sendSafeReply(
 
 fun CommandHandlerEnvironment.sendReplyMessage(
     text: String,
-    replyMarkup: ReplyMarkup? = null
+    replyMarkup: ReplyMarkup? = null,
 ) = bot.sendSafeReply(
     chatId = message.chat.id.toChatId(),
     replyToId = message.messageId,
@@ -54,6 +54,6 @@ fun CallbackQueryHandlerEnvironment.sendReplyMessage(
         chatId = callbackMessage.chat.id.toChatId(),
         replyToId = callbackMessage.messageId,
         text = text,
-        replyMarkup = replyMarkup
+        replyMarkup = replyMarkup,
     )
 }
