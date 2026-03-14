@@ -14,6 +14,8 @@ import com.vad1mchk.litsearchbot.database.DatabaseFactory
 import com.vad1mchk.litsearchbot.database.UserDao
 import com.vad1mchk.litsearchbot.documents.IndexingService
 import io.github.cdimascio.dotenv.dotenv
+import java.nio.file.Files
+import kotlin.io.path.Path
 import kotlin.text.split
 
 object BotContext {
@@ -45,6 +47,11 @@ object BotContext {
     }
 
     fun initializeDatabase() {
+        val path = Path(LSB_DB_PATH)
+        if (!Files.exists(path)) {
+            Files.createFile(path)
+        }
+
         DatabaseFactory.init(LSB_DB_PATH)
         LSB_ADMINS_ON_START.forEach { userId -> UserDao.upsertUser(userId, UserRole.ADMIN) }
     }
