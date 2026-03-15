@@ -75,18 +75,17 @@
 ## Стек использованных технологий
 - Исходный код:
   - Язык программирования: [Kotlin 2.3.0](https://kotlinlang.org/) (JVM)
-  - Фреймворк для интеграции БД / ORM:
-  - Библиотека для взаимодействия с Telegram API:
-  - Библиотека для реализации поиска:
-  - Библиотека для переменных окружения:
+  - Фреймворк для интеграции БД / ORM: [Exposed](https://github.com/JetBrains/Exposed)
+  - Библиотека для взаимодействия с Telegram API: [kotlin-telegram-bot](https://github.com/kotlin-telegram-bot/kotlin-telegram-bot)
+  - Библиотеки для извлечения текста из документов: Apache PDFBox и Apache POI 
+  - Библиотека для переменных окружения: [dotenv-kotlin](https://github.com/cdimascio/dotenv-kotlin)
   - Библиотека для тестирования: JUnit Jupiter
 - Окружение:
   - Окружение языка: JDK Temurin 17
   - Встраиваемая СУБД: SQLite
-  - Драйвер для JDBC: 
 - Сборка:
   - Средство сборки: Gradle (Gradle Kotlin DSL)
-  - Статический анализ (lint): 
-  - Тестирование: 
+  - Статический анализ (lint): [ktlint](https://github.com/pinterest/ktlint)
+  - Тестирование: JUnit Jupiter
 - Развёртывание: 
-  - Контейнеризация: 
+  - Контейнеризация: Docker
