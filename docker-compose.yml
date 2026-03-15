@@ -1,0 +1,12 @@
+services:
+  lit-search-bot:
+    build: .
+    container_name: lit-search-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/app/.env
+      # Don't commit changes to the following lines if they have sensitive host paths
+      - ./data:/app/data
+      - /home/somebody/Documents/literature:/app/data/literature:ro

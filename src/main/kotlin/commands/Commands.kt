@@ -5,188 +5,94 @@ import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.vad1mchk.litsearchbot.auth.RegisterStatus
 import com.vad1mchk.litsearchbot.auth.UserRole
+import com.vad1mchk.litsearchbot.bot.BotContext
 import com.vad1mchk.litsearchbot.database.RegisterRequestDao
 import com.vad1mchk.litsearchbot.database.UserDao
 import com.vad1mchk.litsearchbot.util.CommandHandler
 import com.vad1mchk.litsearchbot.util.breakdownCommand
 import com.vad1mchk.litsearchbot.util.escapeMarkdownV2
 import com.vad1mchk.litsearchbot.util.fullName
-import com.vad1mchk.litsearchbot.util.localizeRole
 import com.vad1mchk.litsearchbot.util.toChatId
 
 object Commands {
-    private object Helpers {
-        @JvmStatic
-        fun toHelpString(command: BotCommand): String {
-            val localizedRole = localizeRole(command.minRole)
-            val argStr = command.args?.let { " ${it.escapeMarkdownV2()}" } ?: ""
-            return """
-                |`${command.commandName.escapeMarkdownV2()}$argStr`
-                |*Минимальная роль:* $localizedRole
-                |*Описание:*
-                |${(command.detailedDescription ?: command.description.escapeMarkdownV2())}
-                """.trimMargin()
-        }
-    }
-
     private val start: CommandHandler = command@{
-        val text = "_${"Добро пожаловать, я бот по поиску литературы!".escapeMarkdownV2()}_"
-        val inlineKeyboardMarkup = InlineKeyboardMarkup.create(
+        val text = """
+        |Добро пожаловать, я бот по поиску литературы\!
+        |Чтобы начать, введите команду /search и поисковой запрос
+        |\(т\. е\. `${"/search <query...>"}`\)\.
+        """.trimMargin()
+        val markup = InlineKeyboardMarkup.create(
             listOf(
-                listOf(
-                    InlineKeyboardButton.CallbackData(
-                        text = "🎃",
-                        callbackData = "pumpkin",
-                    ),
-                    InlineKeyboardButton.CallbackData(
-                        text = "👻",
-                        callbackData = "ghost",
-                    ),
-                    InlineKeyboardButton.CallbackData(
-                        text = "🏗",
-                        callbackData = "crane",
-                    ),
-                ),
+                listOf(InlineKeyboardButton.CallbackData("❓ Справка", "help")),
+                listOf(InlineKeyboardButton.CallbackData("👤 О пользователе", "whoami")),
             ),
         )
-        bot.sendMessage(
-            message.chat.id.toChatId(),
-            text,
-            replyToMessageId = message.messageId,
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyMarkup = inlineKeyboardMarkup,
-        )
+        sendReplyMessage(text, replyMarkup = markup)
     }
 
     private val help: CommandHandler = command@{
-        val fromUser = message.from
-        if (fromUser == null) {
-            bot.sendMessage(
-                message.chat.id.toChatId(),
-                "_" + "Ошибка: отправитель команды неизвестен.".escapeMarkdownV2() + "_",
-                replyToMessageId = message.messageId,
-                parseMode = ParseMode.MARKDOWN_V2,
-            )
+        val fromUser = message.from ?: run {
+            sendReplyMessage("_Ошибка: отправитель команды неизвестен\\._")
             return@command
         }
 
-        val argsList = message.text?.breakdownCommand()
-        if (argsList.isNullOrEmpty()) {
-            bot.sendMessage(
-                message.chat.id.toChatId(),
-                "_" + "Ошибка: при распознавании команды не предоставлен текст.".escapeMarkdownV2() + "_",
-                replyToMessageId = message.messageId,
-                parseMode = ParseMode.MARKDOWN_V2,
-            )
+        val argsList = message.text?.breakdownCommand() ?: run {
+            sendReplyMessage("_Ошибка: при распознавании команды не предоставлен текст\\._")
             return@command
         }
+
+        // Check if user requested help for a specific command: /help search
         if (argsList.size > 1) {
-            val commandName = argsList[1]
-            val commandCandidate = allCommands.find { cmd -> cmd.commandName == commandName }
-            if (commandCandidate == null) {
-                bot.sendMessage(
-                    message.chat.id.toChatId(),
-                    "_Команда с названием:_ `" + commandName.escapeMarkdownV2() + "` _не найдена\\._",
-                    replyToMessageId = message.messageId,
-                    parseMode = ParseMode.MARKDOWN_V2,
-                )
-                return@command
-            }
-
-            bot.sendMessage(
-                message.chat.id.toChatId(),
-                Helpers.toHelpString(commandCandidate),
-                replyToMessageId = message.messageId,
-                parseMode = ParseMode.MARKDOWN_V2,
+            helpForCommandHelper(
+                bot = bot,
+                chatId = message.chat.id.toChatId(),
+                commandName = argsList[1],
+                replyToId = message.messageId,
+                allCommands = allCommands,
             )
-            return@command
+        } else {
+            helpHelper(
+                bot = bot,
+                chatId = message.chat.id.toChatId(),
+                userId = fromUser.id,
+                replyToId = message.messageId,
+                allCommands = allCommands,
+            )
         }
-
-        val currentRole = UserDao.getRole(fromUser.id) ?: UserRole.GUEST
-        val helpText = (
-            "*Список доступных команд:*\n" +
-                allCommands
-                    .filter { cmd -> cmd.permitsRole(currentRole) }
-                    .sortedWith(compareBy<BotCommand> { it.minRole }.thenBy { it.commandName })
-                    .map { cmd ->
-                        "/${cmd.commandName.escapeMarkdownV2()}${cmd.args?.let { " `${it.escapeMarkdownV2()}`" } ?: ""}: " +
-                            cmd.description.escapeMarkdownV2()
-                    }
-                    .joinToString("\n")
-        )
-        bot.sendMessage(
-            message.chat.id.toChatId(),
-            helpText,
-            replyToMessageId = message.messageId,
-            parseMode = ParseMode.MARKDOWN_V2,
-        )
     }
 
     private val whoami: CommandHandler = command@{
-        val fromUser = message.from
-        if (fromUser == null) {
-            bot.sendMessage(
-                message.chat.id.toChatId(),
-                "_" + "Ошибка: отправитель команды неизвестен.".escapeMarkdownV2() + "_",
-                replyToMessageId = message.messageId,
-                parseMode = ParseMode.MARKDOWN_V2,
-            )
+        val fromUser = message.from ?: run {
+            sendReplyMessage("_Ошибка: отправитель команды неизвестен\\._")
             return@command
         }
 
-        val userExists = UserDao.existsUser(fromUser.id)
-        val userRole = UserDao.getRole(fromUser.id) ?: UserRole.GUEST
-
-        val text = """
-        |*Информация о пользователе*:
-        |\- ID: ${fromUser.id}
-        |\- Никнейм: ${fromUser.username?.escapeMarkdownV2() ?: "неизвестно"}
-        |\- Полное имя: ${(fromUser.fullName).escapeMarkdownV2()}
-        |\- Роль: ${localizeRole(userRole).escapeMarkdownV2()}
-        |
-        |Данные об этом пользователе *${if (userExists) "сохранены" else "не сохранены"}*\.
-        """.trimMargin()
-        bot.sendMessage(
+        whoamiHelper(
+            bot = bot,
             chatId = message.chat.id.toChatId(),
-            text = text,
-            replyToMessageId = message.messageId,
-            parseMode = ParseMode.MARKDOWN_V2,
+            user = fromUser,
+            replyToId = message.messageId,
         )
     }
 
     private val register: CommandHandler = command@{
         val fromUser = message.from
         if (fromUser == null) {
-            bot.sendMessage(
-                message.chat.id.toChatId(),
-                "_${"Ошибка: отправитель команды неизвестен.".escapeMarkdownV2()}_",
-                replyToMessageId = message.messageId,
-                parseMode = ParseMode.MARKDOWN_V2,
-            )
+            sendReplyMessage("_Ошибка: отправитель команды неизвестен\\._")
             return@command
         }
 
         // 1. Check role — already registered users cannot submit a request
         val userRole = UserDao.getRole(fromUser.id) ?: UserRole.GUEST
         if (userRole != UserRole.GUEST) {
-            bot.sendMessage(
-                message.chat.id.toChatId(),
-                "_${"Вы уже зарегистрированы в боте.".escapeMarkdownV2()}_",
-                replyToMessageId = message.messageId,
-                parseMode = ParseMode.MARKDOWN_V2,
-            )
+            sendReplyMessage("_Вы уже зарегистрированы в боте\\._")
             return@command
         }
 
         // 2. Check for existing pending request
         val existing = RegisterRequestDao.findPending(fromUser.id)
         if (existing != null) {
-            bot.sendMessage(
-                message.chat.id.toChatId(),
-                "_${"Ваш запрос уже находится на рассмотрении.".escapeMarkdownV2()}_",
-                replyToMessageId = message.messageId,
-                parseMode = ParseMode.MARKDOWN_V2,
-            )
+            sendReplyMessage("_Ваш запрос уже находится на рассмотрении\\._")
             return@command
         }
 
@@ -200,13 +106,7 @@ object Commands {
             name = fromUser.fullName,
         )
 
-        // 4. Notify the user
-        bot.sendMessage(
-            message.chat.id.toChatId(),
-            "_${"Ваш запрос отправлен администраторам.".escapeMarkdownV2()}_",
-            replyToMessageId = message.messageId,
-            parseMode = ParseMode.MARKDOWN_V2,
-        )
+        sendReplyMessage("_Ваш запрос отправлен администраторам\\._")
 
         // 5. Notify admins
         val admins = UserDao.listUsers(userRole = UserRole.ADMIN)
@@ -227,13 +127,13 @@ object Commands {
     }
 
     private val search: CommandHandler = command@{
-        // TODO implement
-        bot.sendMessage(
-            chatId = message.chat.id.toChatId(),
-            text = "_🚧 Эта команда пока не реализована\\._",
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyToMessageId = message.messageId,
-        )
+        val searchQuery = message.text?.breakdownCommand(maxArgs = 0)?.getOrNull(1)?.trim()
+        if (searchQuery.isNullOrBlank()) {
+            sendReplyMessage("_Укажите поисковой запрос после названия команды\\._")
+            return@command
+        }
+
+        showSearchPage(searchQuery)
     }
 
     private val adminListUsers: CommandHandler = command@{
@@ -255,24 +155,14 @@ object Commands {
         val id = args.getOrNull(1)?.toIntOrNull()
 
         if (id == null) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Укажите ID запроса: `/a\\_approve\\_req <id>`_",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Укажите ID запроса: `/a\\_approve\\_req <id>`_")
             return@command
         }
 
         // 1. Lookup request before modifying it
         val req = RegisterRequestDao.getById(id)
         if (req == null || req.status != RegisterStatus.PENDING) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Запрос с ID `$id` не найден или уже был обработан\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Запрос с ID `$id` не найден или уже был обработан\\._")
             return@command
         }
 
@@ -283,12 +173,7 @@ object Commands {
         if (!UserDao.existsUser(req.userId) || UserDao.getById(req.userId)?.role == UserRole.GUEST) {
             UserDao.upsertUser(req.userId, UserRole.REGULAR, req.handle)
         } else {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Пользователь с ID ${req.userId} уже зарегистрирован в системе\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Пользователь с ID ${req.userId} уже зарегистрирован в системе\\._")
             return@command
         }
 
@@ -300,12 +185,7 @@ object Commands {
         )
 
         // 5. Notify the approving admin (confirmation message)
-        bot.sendMessage(
-            chatId = message.chat.id.toChatId(),
-            text = "_Вы одобрили запрос `${id}\\._",
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyToMessageId = message.messageId,
-        )
+        sendReplyMessage("_Вы одобрили запрос `${id}\\._")
     }
 
     private val adminRejectReq: CommandHandler = command@{
@@ -316,24 +196,14 @@ object Commands {
         val reason = args.getOrNull(2)?.ifBlank { null }
 
         if (id == null) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Укажите ID запроса: `/a\\_reject\\_req <id>`_",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Укажите ID запроса: `/a\\_reject\\_req <id>`_")
             return@command
         }
 
         // 1. Lookup request before modifying it
         val req = RegisterRequestDao.getById(id)
         if (req == null || req.status != RegisterStatus.PENDING) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Запрос с ID `$id` не найден или уже был обработан\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Запрос с ID `$id` не найден или уже был обработан\\._")
             return@command
         }
 
@@ -348,12 +218,7 @@ object Commands {
         )
 
         // 5. Notify the approving admin (confirmation message)
-        bot.sendMessage(
-            chatId = message.chat.id.toChatId(),
-            text = "_Вы отклонили запрос `$id`\\. Причина: ${reason?.escapeMarkdownV2() ?: "не указана"}_",
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyToMessageId = message.messageId,
-        )
+        sendReplyMessage("_Вы отклонили запрос `$id`\\. Причина: ${reason?.escapeMarkdownV2() ?: "не указана"}_")
     }
 
     private val adminRegisterUser: CommandHandler = command@{
@@ -361,33 +226,18 @@ object Commands {
         val userId = args.getOrNull(1)?.toLongOrNull()
 
         if (userId == null) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Укажите ID пользователя: `/a\\_register <id>`_",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Укажите ID пользователя: `/a\\_register <id>`_")
             return@command
         }
 
         if (userId == message.from?.id) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Указанный ID пользователя `$userId` совпадает с Вашим\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Указанный ID пользователя `$userId` совпадает с Вашим\\._")
             return@command
         }
 
         val currentRole = UserDao.getRole(userId)
         if (currentRole != null && currentRole != UserRole.GUEST) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Пользователь с ID `$userId` уже зарегистрирован в системе\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Пользователь с ID `$userId` уже зарегистрирован в системе\\._")
             return@command
         }
 
@@ -400,20 +250,10 @@ object Commands {
                 parseMode = ParseMode.MARKDOWN_V2,
             )
         }.onFailure {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Пользователь `$userId` зарегистрирован, но уведомление не отправлено\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Пользователь `$userId` зарегистрирован, но уведомление не отправлено\\._")
         }
 
-        bot.sendMessage(
-            chatId = message.chat.id.toChatId(),
-            text = "_Вы зарегистрировали пользователя `$userId`\\._",
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyToMessageId = message.messageId,
-        )
+        sendReplyMessage("_Вы зарегистрировали пользователя `$userId`\\._")
     }
 
     private val adminUnregisterUser: CommandHandler = command@{
@@ -421,43 +261,23 @@ object Commands {
         val userId = args.getOrNull(1)?.toLongOrNull()
 
         if (userId == null) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Укажите ID пользователя: `/a\\_unregister <id>`_",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Укажите ID пользователя: `/a\\_unregister <id>`_")
             return@command
         }
 
         if (userId == message.from?.id) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Указанный ID пользователя `$userId` совпадает с Вашим\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Указанный ID пользователя `$userId` совпадает с Вашим\\._")
             return@command
         }
 
         val currentRole = UserDao.getRole(userId)
         if (currentRole == null) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Пользователь с ID `$userId` не зарегистрирован в системе\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Пользователь с ID `$userId` не зарегистрирован в системе\\._")
             return@command
         }
 
         if (currentRole == UserRole.ADMIN) {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Нельзя разрегистрировать администратора\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Нельзя разрегистрировать администратора\\._")
             return@command
         }
 
@@ -470,40 +290,103 @@ object Commands {
                 parseMode = ParseMode.MARKDOWN_V2,
             )
         }.onFailure {
-            bot.sendMessage(
-                chatId = message.chat.id.toChatId(),
-                text = "_Пользователь `$userId` разрегистрирован, но уведомление не отправлено\\._",
-                parseMode = ParseMode.MARKDOWN_V2,
-                replyToMessageId = message.messageId,
-            )
+            sendReplyMessage("_Пользователь `$userId` разрегистрирован, но уведомление не отправлено\\._")
         }
 
-        bot.sendMessage(
-            chatId = message.chat.id.toChatId(),
-            text = "_Вы разрегистрировали пользователя `$userId`\\._",
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyToMessageId = message.messageId,
-        )
+        sendReplyMessage("_Вы разрегистрировали пользователя `$userId`\\._")
     }
 
     private val adminReindex: CommandHandler = command@{
-        // TODO implement
-        bot.sendMessage(
+        val newMessage = bot.sendMessage(
             chatId = message.chat.id.toChatId(),
-            text = "_🚧 Эта команда пока не реализована\\._",
+            text = "⌛ _Реиндексация в процессе_ \\(подготовка…\\)",
             parseMode = ParseMode.MARKDOWN_V2,
             replyToMessageId = message.messageId,
         )
+        val newMessageId = newMessage.getOrNull()?.messageId
+        var resultMessageText = ""
+
+        try {
+            val stats = BotContext.indexingService.reindex { current, total ->
+                val emoji = if (current % 2 == 0) "⏳" else "⌛️"
+                if (newMessageId != null) {
+                    bot.editMessageText(
+                        chatId = message.chat.id.toChatId(),
+                        messageId = newMessageId,
+                        text = "$emoji _Реиндексация в процессе_ \\($current/$total\\)",
+                        parseMode = ParseMode.MARKDOWN_V2,
+                    )
+                }
+            }
+            resultMessageText = """
+            |✅ _Реиндексация завершена\._
+            |\- Актуальные: ${stats.upToDate}
+            |\- Обновлено: ${stats.updated}
+            |\- Добавлено: ${stats.added}
+            |\- Удалено: ${stats.deleted}
+            |\- Не удалось обработать: ${stats.failed}
+            """.trimMargin()
+        } catch (e: Exception) {
+            resultMessageText = "❌ _При индексации произошла ошибка:_ `${
+                e.message?.escapeMarkdownV2() ?: "неизвестная ошибка"
+            }`"
+        }
+
+        if (newMessageId != null) {
+            bot.editMessageText(
+                chatId = message.chat.id.toChatId(),
+                messageId = newMessageId,
+                text = resultMessageText,
+                parseMode = ParseMode.MARKDOWN_V2,
+            )
+        } else {
+            bot.sendMessage(
+                chatId = message.chat.id.toChatId(),
+                replyToMessageId = message.messageId,
+                text = resultMessageText,
+                parseMode = ParseMode.MARKDOWN_V2,
+            )
+        }
     }
 
     private val adminIndexInfo: CommandHandler = command@{
-        // TODO implement
-        bot.sendMessage(
-            chatId = message.chat.id.toChatId(),
-            text = "_🚧 Эта команда пока не реализована\\._",
-            parseMode = ParseMode.MARKDOWN_V2,
-            replyToMessageId = message.messageId,
+        val stats = BotContext.indexingService.computeTotalStats()
+        val statsByCategory = mapOf(
+            "Актуальные" to stats.upToDate,
+            "Устаревшие" to stats.outdated,
+            "Исчезнувшие" to stats.disappeared,
+            "Не индексированы" to stats.unindexed,
         )
+            .filter { it.value != 0 }
+            .map { "\\- ${it.key}: ${it.value}" }
+            .joinToString("\n")
+
+        val warningText = if (stats.disappeared != 0 || stats.unindexed != 0) {
+            "⚠ Список файлов в индексе отличается от списка файлов на диске!"
+        } else if (stats.outdated != 0) {
+            "⚠ Представления некоторых файлов в индексе устарели!"
+        } else {
+            null
+        }
+        val reindexText = "Запустите реиндексацию командой /a_reindex."
+
+        val resultMessageText = """
+        |🏗 _Информация об индексе:_
+        |$statsByCategory
+        |
+        |\- Всего файлов на диске: ${stats.totalOnDisk}
+        |\- Всего файлов в базе данных: ${stats.totalInDatabase}
+        |
+        |${
+            if (warningText != null) {
+                ("> *${warningText.escapeMarkdownV2()}*\n> *${reindexText.escapeMarkdownV2()}*")
+            } else {
+                ""
+            }
+        }
+        """.trimMargin()
+
+        sendReplyMessage(resultMessageText)
     }
 
     @JvmStatic
@@ -549,7 +432,7 @@ object Commands {
             handler = Commands.search,
             args = "<query...>",
             detailedDescription = """
-                |Выполняет поиск по литературе, используя заданный запрос\.
+                |Выполняет полнотекстовый поиск по литературе, используя заданный запрос\.
                 |Результаты выводятся с пагинацией и кнопками\.
             """.trimMargin(),
         ),

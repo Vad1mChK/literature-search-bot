@@ -7,21 +7,29 @@ import com.vad1mchk.litsearchbot.database.entity.Users
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.slf4j.LoggerFactory
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import java.nio.file.Files
 
-object DatabaseFactory {
-    val logger = LoggerFactory.getLogger("DatabaseFactory")
+abstract class DatabaseTestBase {
+    private lateinit var dbFile: java.nio.file.Path
 
-    fun init(dbPath: String) {
-        Database.connect("jdbc:sqlite:$dbPath", driver = "org.sqlite.JDBC")
+    @BeforeEach
+    fun setUpDatabase() {
+        dbFile = Files.createTempFile("litsearchbot-test-", ".db")
+        Database.connect(
+            url = "jdbc:sqlite:${dbFile.toAbsolutePath()}",
+            driver = "org.sqlite.JDBC",
+        )
 
         transaction {
-            // Create tables if they don't exist
             SchemaUtils.create(Users, RegisterRequests, IndexedDocuments, SearchQueryLookups)
             IndexedDocumentsDao.initFts()
-            //
         }
+    }
 
-        logger.info("Database tables created: Users, RegisterRequests, IndexedDocuments, SearchQueryLookups")
+    @AfterEach
+    fun tearDownDatabase() {
+        Files.deleteIfExists(dbFile)
     }
 }
