@@ -23,8 +23,6 @@ class IndexingServiceTest : DatabaseTestBase() {
     private lateinit var literatureDir: File
     private lateinit var indexingService: IndexingService
 
-    val emptyLambda: (Int, Int) -> Unit = { _, _ -> }
-
     @BeforeEach
     fun setupTests() {
         val litPath = tempDir.resolve("literature")
@@ -62,11 +60,11 @@ class IndexingServiceTest : DatabaseTestBase() {
 
     @Test
     fun reindex_afterAddingNewTextFile_deltaShouldCountAddedFile() {
-        indexingService.reindex(emptyLambda)
+        indexingService.reindex()
         val file = literatureDir.resolve("addFile.txt")
         file.writeText("Lorem Ipsum Dolor Sit Amet")
 
-        val deltaStats = indexingService.reindex(emptyLambda)
+        val deltaStats = indexingService.reindex()
         assertEquals(1, deltaStats.added)
         assertEquals(0, deltaStats.updated)
         assertEquals(0, deltaStats.deleted)
@@ -77,11 +75,11 @@ class IndexingServiceTest : DatabaseTestBase() {
     fun reindex_afterDeletingTextFile_deltaShouldCountDeletedFile() {
         val file = literatureDir.resolve("deleteFile.txt")
         file.writeText("Lorem Ipsum Dolor Sit Amet")
-        indexingService.reindex(emptyLambda)
+        indexingService.reindex()
 
         file.delete()
 
-        val deltaStats = indexingService.reindex(emptyLambda)
+        val deltaStats = indexingService.reindex()
         assertEquals(0, deltaStats.added)
         assertEquals(0, deltaStats.updated)
         assertEquals(1, deltaStats.deleted)
@@ -91,7 +89,7 @@ class IndexingServiceTest : DatabaseTestBase() {
     fun computeTotalStats_afterDeletingFileOnDiskWithoutReindex_totalShouldCountDisappearedFile() {
         val file = literatureDir.resolve("deleteFile.txt")
         file.writeText("Lorem Ipsum Dolor Sit Amet")
-        indexingService.reindex(emptyLambda)
+        indexingService.reindex()
 
         file.delete()
 
@@ -102,7 +100,7 @@ class IndexingServiceTest : DatabaseTestBase() {
 
     @Test
     fun computeTotalStats_afterAddingFileOnDiskWithoutReindex_totalShouldCountUnindexedFile() {
-        indexingService.reindex(emptyLambda)
+        indexingService.reindex()
 
         val file = literatureDir.resolve("deleteFile.txt")
         file.writeText("Lorem Ipsum Dolor Sit Amet")
