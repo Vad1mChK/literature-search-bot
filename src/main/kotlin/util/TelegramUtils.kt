@@ -11,4 +11,9 @@ typealias CallbackQueryHandler = CallbackQueryHandlerEnvironment.() -> Unit
 
 fun Long.toChatId(): ChatId = ChatId.fromId(this)
 
+/**
+ * If the user's `lastName` is not null, returns a concatenation of `firstName + ' ' + lastName`.
+ * Otherwise returns just `firstName`.
+ * @return The full display name of the user.
+ */
 val User.fullName get() = "$firstName${lastName?.let { " $it" } ?: ""}"

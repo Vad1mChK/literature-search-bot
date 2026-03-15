@@ -14,21 +14,42 @@ import com.vad1mchk.litsearchbot.database.DatabaseFactory
 import com.vad1mchk.litsearchbot.database.UserDao
 import com.vad1mchk.litsearchbot.documents.IndexingService
 import io.github.cdimascio.dotenv.dotenv
+import java.nio.file.Files
+import kotlin.io.path.Path
 import kotlin.text.split
 
+/**
+ * Object encapsulating fields accessible from anywhere in the app,
+ * including environment variables.
+ */
 object BotContext {
     // Env vars
+
+    /**
+     * Token of the Telegram bot used by the app.
+     */
     @JvmStatic val LSB_BOT_TOKEN: String
 
+    /**
+     * List of Telegram IDs of users that should be added as admins on bot start.
+     */
     @JvmStatic val LSB_ADMINS_ON_START: List<Long>
 
+    /**
+     * Path to the database file from the app's working directory.
+     */
     @JvmStatic val LSB_DB_PATH: String
 
+    /**
+     * Path to the literature directory from the app's working directory.
+     */
     @JvmStatic val LSB_LITERATURE_PATH: String
 
     // App globals
+
     @JvmStatic lateinit var bot: Bot
-    lateinit var indexingService: IndexingService
+
+    @JvmStatic lateinit var indexingService: IndexingService
 
     init {
         val env = dotenv()
@@ -45,6 +66,11 @@ object BotContext {
     }
 
     fun initializeDatabase() {
+        val path = Path(LSB_DB_PATH)
+        if (!Files.exists(path)) {
+            Files.createFile(path)
+        }
+
         DatabaseFactory.init(LSB_DB_PATH)
         LSB_ADMINS_ON_START.forEach { userId -> UserDao.upsertUser(userId, UserRole.ADMIN) }
     }

@@ -78,6 +78,9 @@ fun String.breakdownCommand(maxArgs: Int? = null): List<String> {
     return result
 }
 
+/**
+ * Computes the MD5 hash (128-bit, 32 hexadecimal characters) of the string.
+ */
 fun md5(input: String): String {
     val md = MessageDigest.getInstance("MD5")
     return BigInteger(1, md.digest(input.toByteArray()))
