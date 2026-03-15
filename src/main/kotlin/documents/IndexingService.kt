@@ -5,6 +5,7 @@ import org.apache.commons.codec.digest.DigestUtils
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
 import org.apache.poi.extractor.ExtractorFactory
+import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
@@ -12,6 +13,8 @@ import java.io.File
  * @property literaturePath Path to the literature directory.
  */
 class IndexingService(private val literaturePath: String) {
+    private val logger = LoggerFactory.getLogger("IndexingService")
+
     /**
      * Reindexes the literature directory, updating the index based on the current state of the files.
      * @param onProgress Optional callback on progress, taking in the count of files already reindexed and the total
@@ -22,6 +25,8 @@ class IndexingService(private val literaturePath: String) {
         val root = File(literaturePath)
         val supported = setOf("txt", "pdf", "docx")
 
+        logger.info("Reindex started...")
+
         val runStart = System.currentTimeMillis()
         var stats = IndexingDeltaStats(runStartedAt = runStart, runFinishedAt = runStart)
 
@@ -30,8 +35,7 @@ class IndexingService(private val literaturePath: String) {
             .associateBy { it.relativeTo(root).path }
         val dbFiles = IndexedDocumentsDao.getAllMetadataByOriginalPath()
 
-        println("db files: $dbFiles")
-        println("disk files: $diskFiles")
+        logger.info("Reindex: found ${dbFiles.size} files in DB and ${diskFiles.size} files on disk")
 
         // 1. Handle Deletions (In DB but not on disk)
         dbFiles.keys.filter { it !in diskFiles }.forEach { path ->
@@ -64,12 +68,14 @@ class IndexingService(private val literaturePath: String) {
                     }
                 }
             } catch (e: Exception) {
+                logger.error("Failed to reindex file on disk: $path")
                 stats = stats.copy(failed = stats.failed + 1)
             }
             onProgress?.invoke(index + 1, total)
         }
 
         stats = stats.copy(runFinishedAt = System.currentTimeMillis())
+        logger.info("Reindex finished, returning results: $stats")
         return stats
     }
 
@@ -111,7 +117,7 @@ class IndexingService(private val literaturePath: String) {
         val newestDiskTimestamp = diskFiles.values.maxOrNull() ?: 0L
         val newestIndexedTimestamp = dbFiles.values.maxOrNull() ?: 0L
 
-        return IndexingTotalStats(
+        val stats = IndexingTotalStats(
             totalOnDisk = totalOnDisk,
             totalInDatabase = totalInDb,
             upToDate = upToDate,
@@ -121,9 +127,13 @@ class IndexingService(private val literaturePath: String) {
             newestDiskTimestamp = newestDiskTimestamp,
             newestIndexedTimestamp = newestIndexedTimestamp,
         )
+        logger.info("Computed total stats: $stats")
+        return stats
     }
 
     private fun processFile(file: File, path: String, lastModified: Long) {
+        logger.info("Processing file: $path")
+
         val text = extractText(file) ?: ""
         val hash = DigestUtils.md5Hex(path)
         IndexedDocumentsDao.updateDocument(hash, path, file.extension, lastModified, text)
@@ -150,6 +160,7 @@ class IndexingService(private val literaturePath: String) {
                 else -> null
             }
         } catch (e: Exception) {
+            logger.error("Failed to extract text from file: ${file.path}")
             null
         }
     }

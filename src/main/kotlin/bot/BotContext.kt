@@ -14,6 +14,7 @@ import com.vad1mchk.litsearchbot.database.DatabaseFactory
 import com.vad1mchk.litsearchbot.database.UserDao
 import com.vad1mchk.litsearchbot.documents.IndexingService
 import io.github.cdimascio.dotenv.dotenv
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import kotlin.io.path.Path
 import kotlin.text.split
@@ -28,28 +29,30 @@ object BotContext {
     /**
      * Token of the Telegram bot used by the app.
      */
-    @JvmStatic val LSB_BOT_TOKEN: String
+    @JvmField val LSB_BOT_TOKEN: String
 
     /**
      * List of Telegram IDs of users that should be added as admins on bot start.
      */
-    @JvmStatic val LSB_ADMINS_ON_START: List<Long>
+    @JvmField val LSB_ADMINS_ON_START: List<Long>
 
     /**
      * Path to the database file from the app's working directory.
      */
-    @JvmStatic val LSB_DB_PATH: String
+    @JvmField val LSB_DB_PATH: String
 
     /**
      * Path to the literature directory from the app's working directory.
      */
-    @JvmStatic val LSB_LITERATURE_PATH: String
+    @JvmField val LSB_LITERATURE_PATH: String
 
     // App globals
 
     @JvmStatic lateinit var bot: Bot
 
     @JvmStatic lateinit var indexingService: IndexingService
+
+    @JvmStatic private val logger = LoggerFactory.getLogger("BotContext")
 
     init {
         val env = dotenv()
@@ -63,6 +66,7 @@ object BotContext {
             ?: throw IllegalArgumentException("Env variable LSB_DB_PATH is not set")
         LSB_LITERATURE_PATH = env["LSB_LITERATURE_PATH"]
             ?: throw IllegalArgumentException("Env variable LSB_LITERATURE_PATH is not set")
+        logger.debug("Initialized env vars")
     }
 
     fun initializeDatabase() {
@@ -73,6 +77,7 @@ object BotContext {
 
         DatabaseFactory.init(LSB_DB_PATH)
         LSB_ADMINS_ON_START.forEach { userId -> UserDao.upsertUser(userId, UserRole.ADMIN) }
+        logger.debug("Initialized database")
     }
 
     fun initializeHandlers() {
@@ -110,9 +115,11 @@ object BotContext {
         }
 
         indexingService = IndexingService(LSB_LITERATURE_PATH)
+        logger.debug("Initialized command & callback handlers")
     }
 
     fun startBot() {
+        logger.debug("Starting bot...")
         bot.getUpdates(allowedUpdates = listOf("message", "callback_query"))
         bot.startPolling()
     }
